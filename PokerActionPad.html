@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Ergonomic Poker Keyboard</title>
+    <style>
+        /* 全体のスタイル */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            touch-action: manipulation;
+        }
+
+        /* キーボードコンテナのスタイル */
+        .keyboard-container {
+            width: 100%;
+            max-width: 380px; /* 4列レイアウトに合わせて調整 */
+            background-color: #333;
+            padding: 16px;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+            position: relative; /* ポップアップをキーボード内に収めるため */
+        }
+
+        /* ハンドヒストリー表示部分のスタイル */
+        .display {
+            background-color: #444;
+            color: #fff;
+            font-size: 1.5rem;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            text-align: left;
+            min-height: 30px;
+            box-sizing: border-box;
+            border: 1px solid #555;
+            word-wrap: break-word;
+        }
+
+        /* キーボードのグリッドレイアウト */
+        .keyboard-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr); /* 4列に変更 */
+            gap: 8px;
+        }
+
+        /* ボタンの共通スタイル */
+        .key {
+            background-color: #666;
+            color: #fff;
+            font-size: 1.25rem;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            height: 60px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s;
+            position: relative;
+        }
+
+        /* 各アクションボタンの色分け */
+        .key.action-base { background-color: #5cb85c; } /* アクションフリックキーのベース色 */
+
+        /* スート（マーク）のスタイル */
+        .suit { font-size: 1.5rem; }
+        .spade { color: #000000; }
+        .heart { color: #ff5252; }
+        .diamond { color: #448aff; }
+        .club { color: #69f0ae; }
+
+        /* --- 十字フリック入力関連のスタイル --- */
+        .flick-popup {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 1px;
+            height: 1px;
+            display: none;
+            z-index: 100;
+        }
+
+        .flick-popup.visible {
+            display: block;
+        }
+
+        .flick-key {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background-color: #fdfdfd;
+            color: #333;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.1rem; /* アクション名が収まるように少し調整 */
+            font-weight: bold;
+            transition: transform 0.1s ease, background-color 0.1s ease;
+        }
+
+        /* 十字キーの配置 */
+        .flick-center { transform: translate(-50%, -50%); }
+        .flick-top    { transform: translate(-50%, -165%); }
+        .flick-right  { transform: translate(65%, -50%); }
+        .flick-bottom { transform: translate(-50%, 65%); }
+        .flick-left   { transform: translate(-165%, -50%); }
+
+        /* ハイライトされたキーのスタイル */
+        .flick-key.highlight {
+            background-color: #337ab7;
+            color: #fff;
+            transform: scale(1.1) translate(-45%, -45%);
+        }
+        .flick-top.highlight    { transform: scale(1.1) translate(-45%, -160%); }
+        .flick-right.highlight  { transform: scale(1.1) translate(60%, -45%); }
+        .flick-bottom.highlight { transform: scale(1.1) translate(-45%, 60%); }
+        .flick-left.highlight   { transform: scale(1.1) translate(-160%, -45%); }
+    </style>
+</head>
+<body>
+
+    <div class="keyboard-container">
+        <div class="display" id="display"></div>
+        <div class="keyboard-grid">
+            <button class="key">7</button>
+            <button class="key">8</button>
+            <button class="key">9</button>
+            <button class="key flick-base action-base" data-flick-keys='["Bet", "Raise", "Call", "Check", "Fold"]'>
+                Action
+            </button>
+
+            <button class="key">4</button>
+            <button class="key">5</button>
+            <button class="key">6</button>
+            <button class="key flick-base" data-flick-keys='["A", "K", "Q", "J", "T"]'>A</button>
+
+            <button class="key">1</button>
+            <button class="key">2</button>
+            <button class="key">3</button>
+            <button class="key flick-base" data-flick-keys='["♠", "♥", "♦", "♣", ""]'>
+                <span class="suit spade">♠</span>
+            </button>
+
+            <button class="key" id="clear">C</button>
+            <button class="key">0</button>
+            <button class="key">.</button>
+            <button class="key" id="backspace">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const display = document.getElementById('display');
+        const normalKeys = document.querySelectorAll('.key:not(.flick-base)');
+        const flickBaseKeys = document.querySelectorAll('.flick-base');
+
+        // 通常キー（フリック以外）の入力処理
+        normalKeys.forEach(key => {
+            key.addEventListener('click', () => {
+                const keyText = key.textContent.trim();
+
+                if (key.id === 'backspace') {
+                    // --- Backspace logic is updated for robustness ---
+                    let currentText = display.textContent;
+                    if (currentText.length === 0) return; // 何もなければ終了
+
+                    const actions = ["Bet", "Raise", "Call", "Check", "Fold"];
+                    const actionsWithSpaces = actions.map(a => ` ${a} `);
+
+                    // Check if the text ends with an action word
+                    for (const action of actionsWithSpaces) {
+                        if (currentText.endsWith(action)) {
+                            // アクションワードが見つかったら、それを削除して処理を終了
+                            display.textContent = currentText.slice(0, -action.length);
+                            return; // ここで関数を抜ける
+                        }
+                    }
+
+                    // ループを抜けてもアクションワードが見つからなかった場合、
+                    // 末尾の一文字を削除
+                    display.textContent = currentText.slice(0, -1);
+                    // --- End of update ---
+
+                } else if (key.id === 'clear') {
+                    // Cキー：全削除
+                    display.textContent = '';
+                } else if(keyText) {
+                    // その他のキー：文字を追加
+                    display.textContent += keyText;
+                }
+            });
+        });
+
+        // フリック入力のロジック
+        flickBaseKeys.forEach(baseKey => {
+            let popup = null;
+            let isDragging = false;
+            let startX, startY;
+            const longPressTimeout = 150;
+            let pressTimer;
+            const flickDirections = ['center', 'top', 'right', 'bottom', 'left'];
+            const flickData = JSON.parse(baseKey.dataset.flickKeys);
+
+            const createPopup = () => {
+                if (document.querySelector('.flick-popup')) return;
+                popup = document.createElement('div');
+                popup.className = 'flick-popup';
+                flickData.forEach((val, index) => {
+                    if (!val) return;
+                    const direction = flickDirections[index];
+                    const flickKey = document.createElement('div');
+                    flickKey.className = `flick-key flick-${direction}`;
+                    flickKey.dataset.value = val;
+                    flickKey.dataset.direction = direction;
+                    if (val === '♠') flickKey.innerHTML = `<span class="suit spade">${val}</span>`;
+                    else if (val === '♥') flickKey.innerHTML = `<span class="suit heart">${val}</span>`;
+                    else if (val === '♦') flickKey.innerHTML = `<span class="suit diamond">${val}</span>`;
+                    else if (val === '♣') flickKey.innerHTML = `<span class="suit club">${val}</span>`;
+                    else flickKey.textContent = val;
+                    popup.appendChild(flickKey);
+                });
+                baseKey.appendChild(popup);
+                
+                // --- ▼▼▼ ここからが修正・追加したコード ▼▼▼ ---
+                // ポップアップを一時的に表示して、はみ出しを計算する
+                popup.style.visibility = 'hidden';
+                popup.classList.add('visible');
+
+                const keyboardContainer = baseKey.closest('.keyboard-container');
+                const containerRect = keyboardContainer.getBoundingClientRect();
+
+                // 全フリックキーを含むおおよその領域を計算
+                let minX = Infinity, minY = Infinity, maxX = 0, maxY = 0;
+                popup.querySelectorAll('.flick-key').forEach(key => {
+                    const keyRect = key.getBoundingClientRect();
+                    if (keyRect.left < minX) minX = keyRect.left;
+                    if (keyRect.top < minY) minY = keyRect.top;
+                    if (keyRect.right > maxX) maxX = keyRect.right;
+                    if (keyRect.bottom > maxY) maxY = keyRect.bottom;
+                });
+
+                let offsetX = 0;
+                let offsetY = 0;
+                const margin = 8; // 境界線からのマージン
+
+                // はみ出しをチェックしてオフセットを計算
+                if (maxX > containerRect.right) {
+                    offsetX = containerRect.right - maxX - margin;
+                }
+                if (minX < containerRect.left) {
+                    offsetX = containerRect.left - minX + margin;
+                }
+                if (maxY > containerRect.bottom) {
+                    offsetY = containerRect.bottom - maxY - margin;
+                }
+                if (minY < containerRect.top) {
+                    offsetY = containerRect.top - minY + margin;
+                }
+
+                // 計算したオフセットを適用
+                popup.style.transform = `translate(calc(-50% + ${offsetX}px), calc(-50% + ${offsetY}px))`;
+                
+                // ユーザーに表示する
+                popup.style.visibility = 'visible';
+                // --- ▲▲▲ ここまでが修正・追加したコード ▲▲▲ ---
+            };
+            const removePopup = () => {
+                if (popup) { popup.remove(); popup = null; }
+            };
+            const updateHighlight = (x, y) => {
+                if (!popup) return null;
+                const deltaX = x - startX;
+                const deltaY = y - startY;
+                const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                let direction = 'center';
+                const distanceThreshold = 25;
+                if (distance > distanceThreshold) {
+                    const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+                    if (angle > -135 && angle <= -45) direction = 'top';
+                    else if (angle > -45 && angle <= 45) direction = 'right';
+                    else if (angle > 45 && angle <= 135) direction = 'bottom';
+                    else direction = 'left';
+                }
+                let highlightedKey = null;
+                popup.querySelectorAll('.flick-key').forEach(fk => {
+                    if (fk.dataset.direction === direction) {
+                        fk.classList.add('highlight');
+                        highlightedKey = fk;
+                    } else {
+                        fk.classList.remove('highlight');
+                    }
+                });
+                return highlightedKey;
+            };
+            const handleStart = (e) => {
+                e.preventDefault();
+                const touch = e.touches ? e.touches[0] : e;
+                startX = touch.clientX;
+                startY = touch.clientY;
+                isDragging = false;
+                pressTimer = setTimeout(() => {
+                    createPopup();
+                    updateHighlight(startX, startY);
+                }, longPressTimeout);
+                window.addEventListener('mousemove', handleMove);
+                window.addEventListener('touchmove', handleMove, { passive: false });
+                window.addEventListener('mouseup', handleEnd);
+                window.addEventListener('touchend', handleEnd);
+            };
+            const handleMove = (e) => {
+                e.preventDefault();
+                if (!isDragging) {
+                    const touch = e.touches ? e.touches[0] : e;
+                    const moveThreshold = 5;
+                    if(Math.abs(touch.clientX - startX) > moveThreshold || Math.abs(touch.clientY - startY) > moveThreshold){
+                         isDragging = true;
+                    }
+                }
+                if (!popup) { clearTimeout(pressTimer); createPopup(); }
+                const touch = e.touches ? e.touches[0] : e;
+                updateHighlight(touch.clientX, touch.clientY);
+            };
+            const handleEnd = (e) => {
+                clearTimeout(pressTimer);
+                const highlightedKey = popup ? popup.querySelector('.flick-key.highlight') : null;
+
+                // Actionキーかどうかを判定
+                const isActionKey = baseKey.classList.contains('action-base');
+                
+                if (highlightedKey) {
+                    let value = highlightedKey.dataset.value;
+                    display.textContent += isActionKey ? ` ${value} ` : value;
+                } else if (!isDragging && !popup) {
+                    let value = flickData[0];
+                    display.textContent += isActionKey ? ` ${value} ` : value;
+                }
+
+                removePopup();
+                window.removeEventListener('mousemove', handleMove);
+                window.removeEventListener('touchmove', handleMove);
+                window.removeEventListener('mouseup', handleEnd);
+                window.removeEventListener('touchend', handleEnd);
+            };
+            baseKey.addEventListener('mousedown', handleStart);
+            baseKey.addEventListener('touchstart', handleStart, { passive: false });
+        });
+    </script>
+
+</body>
+</html>
